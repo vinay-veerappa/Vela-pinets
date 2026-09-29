@@ -2,6 +2,56 @@
 
 All notable changes to Vela-pinets, newest first.
 
+## [v0.2.14]
+
+### Added
+
+- **Volume footprints for Pine's `request.footprint()`.** Both engines accept a
+  `footprints` option — a host-supplied `FootprintSource`
+  (`(symbol, timeframe, range) => Promise<FootprintBar[]>`) — and expose it to PineTS
+  as the optional `getFootprintData` surface of the virtual market-data provider, for
+  static runs and live streams alike. Vela owns bars, never order flow, so this is
+  how a host with a footprint-capable data source feeds the `footprint` /
+  `volume_row` API; without the option the surface is absent and
+  `request.footprint()` answers `na` on every bar, as PineTS specifies. A
+  `request.footprint()` inside `request.security()` asks the source for that
+  context's own symbol and timeframe. The worker
+  engine round-trips each call to the main thread (`fetchFootprints` /
+  `fetchFootprintsResult`, the `fetchSeries` pattern), and `execute` merely flags
+  that a source exists. Chart-type modifiers are stripped before the source is asked
+  (order flow is never derived). Types `FootprintSource`, `FootprintBar`,
+  `FootprintLevel`, `FootprintRange` are exported.
+
+### Changed
+
+- **Built against pinets 0.10.0.** The browser builds and the worker bundle inline
+  pinets 0.10.0, the first release with `request.footprint()`. The `pinets` peer
+  range stays `>=0.9.31`: on an older pinets the `footprints` option is inert and
+  harmless.
+- **Supports `@luxalgo/vela` 0.8.** The peer range widens from `^0.7.7` to
+  `^0.7.7 || ^0.8.0`, so hosts on Vela 0.8 install this release without a peer
+  conflict, and hosts on 0.7.7 or later keep working unchanged.
+
+## [v0.2.13]
+
+### Added
+
+- **Each closed trade now reports its own ledger to the host.** The round trips a
+  strategy exposes through its execution context (`trades`) carry Pine's per-trade
+  figures under Vela's names: realized profit net of commission (`pnl`), the commission
+  charged (`commission`), and the trade's worst and best excursion from entry
+  (`maxDrawdown`, `maxRunup` — Pine's `strategy.closedtrades.max_drawdown` /
+  `max_runup`, latched from each bar's high and low). A trade that has not set a figure
+  — an open one has no realized profit yet — leaves the field absent rather than zero.
+
+### Changed
+
+- **Requires `@luxalgo/vela` 0.7.7 or later.** The per-trade ledger fields above are
+  declared on Vela's trade type only from 0.7.7, so the peer range narrows from `^0.7.1`
+  to `^0.7.7`. _(Breaking: hosts on Vela 0.7.1–0.7.6 must upgrade Vela to install this
+  release; on those versions the fields would still ride along at runtime but without
+  types.)_
+
 ## [v0.2.12]
 
 ### Added
