@@ -2,6 +2,63 @@
 
 All notable changes to Vela-pinets, newest first.
 
+## [v0.3.0]
+
+### Added
+
+- **Scripts can import Pine libraries.** Both engines take an `importResolver` option
+  that returns a library's Pine source for an import path (`user/library/version`). It is
+  asked once, when the script is prepared, for every library the script imports and the
+  libraries those import; the worker-backed engine asks it on the main thread. Inputs
+  declared with an imported enum list that enum's options in the settings dialog. A script
+  importing a library the resolver does not know fails to prepare, with an error naming
+  the import.
+
+### Changed
+
+- **Requires PineTS 0.13.0.** The `pinets` peer range is now `>=0.13.0`, the first PineTS
+  release that links imported libraries, and the worker bundle carries PineTS 0.13.0.
+
+## [v0.2.18]
+
+### Changed
+
+- **Built against `@luxalgo/vela` 0.9.0.** The peer range widens to
+  `^0.7.7 || ^0.8.0 || ^0.9.0`, so the engine installs next to Vela 0.9 without a peer
+  conflict, and earlier Vela releases stay supported. Scripts run, plot and report as
+  before.
+
+## [v0.2.17]
+
+### Changed
+
+- **Built against `@luxalgo/vela` 0.8.5.** The peer range `^0.7.7 || ^0.8.0` already
+  covers it and is unchanged.
+- **The worker bundle carries PineTS 0.12.0.** Scripts run in a Web Worker get its
+  strategy broker emulator, rebuilt to fill orders along each bar's path, with its margin,
+  risk and reporting fixes. Pine v5 strategies now default to no margin model, and a
+  strategy that passes an invalid order argument, such as a negative `qty`, stops with a
+  runtime error instead of running with a silently adjusted order. The in-process engine
+  uses the PineTS you install, within the unchanged `>=0.9.31` peer range.
+
+### Fixed
+
+- **`plot()` offsets had no visible effect.** A plot with an `offset` drew on the same
+  bars as an unshifted one, so `offset=-10` and `offset=10` plots of the same series
+  overlapped. Plots now move by the given number of bars. On `@luxalgo/vela` 0.8.5 or
+  later, a forward offset keeps drawing into the empty space on the right of the latest
+  candle; earlier releases draw it up to the latest candle. `plotshape()`, `plotchar()` and `plotarrow()` markers with
+  an `offset` now move by whole bars too, so they stay on the right bar across session
+  gaps.
+
+## [v0.2.16]
+
+### Changed
+
+- **Built against `@luxalgo/vela` 0.8.4.** The worker bundle carries the few Vela values
+  it uses from this release. The peer range `^0.7.7 || ^0.8.0` already covers it and is
+  unchanged.
+
 ## [v0.2.15]
 
 ### Fixed
