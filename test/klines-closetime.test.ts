@@ -102,3 +102,35 @@ describe('time_close through a real PineTS run', () => {
         expect(first.value).toBe(cmeT(12, 9, 30)); // full bucket → open + 1h
     });
 });
+
+describe('toKlines closeTime: session from the request', () => {
+    // 05:00 NY is outside regular (0930-1600), inside extended (0400-2000).
+    const pre = [bar(nyT(12, 5, 0))];
+    // 10:00 NY is inside both; bars alone would infer regular.
+    const rth = [bar(nyT(12, 10, 0))];
+
+    it("request 'regular' wins: a pre-market bar has no regular window, so no closeTime", () => {
+        expect(toKlines(pre, '60', NY, 'regular')[0]!.closeTime).toBeUndefined();
+    });
+
+    it("request 'extended' is honoured on an RTH-only series, and 'regular' on the same bars agrees mid-day", () => {
+        expect(toKlines(rth, '60', NY, 'extended')[0]!.closeTime).toBe(nyT(12, 11, 0));
+        expect(toKlines(rth, '60', NY, 'regular')[0]!.closeTime).toBe(nyT(12, 11, 0));
+    });
+
+    it("request 'extended' vs 'regular' differ on the last bucket of the day", () => {
+        const last = [bar(nyT(12, 15, 30))];
+        expect(toKlines(last, '60', NY, 'regular')[0]!.closeTime).toBe(nyT(12, 16, 0));
+        expect(toKlines(last, '60', NY, 'extended')[0]!.closeTime).toBe(nyT(12, 16, 30));
+    });
+
+    it('absent request session keeps the old behaviour (inferred from the bars)', () => {
+        const last = [bar(nyT(12, 15, 30))];
+        expect(toKlines(last, '60', NY)[0]!.closeTime).toBe(nyT(12, 16, 0));
+        expect(toKlines(last, '60', NY, undefined)[0]!.closeTime).toBe(nyT(12, 16, 0));
+        // A pre-market bar present -> inferred extended, same as before.
+        expect(toKlines([bar(nyT(12, 5, 0)), bar(nyT(12, 15, 30))], '60', NY)[1]!.closeTime).toBe(nyT(12, 16, 30));
+        // Unrecognised value is treated as absent.
+        expect(toKlines(last, '60', NY, 'bogus')[0]!.closeTime).toBe(nyT(12, 16, 0));
+    });
+});

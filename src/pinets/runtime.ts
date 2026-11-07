@@ -251,7 +251,7 @@ export async function runPineStatic(opts: {
     const { ind, bars, market, visibleRange, prepared, instanceId, inputs, props, fetchSeries, footprints } = opts;
     ensurePineTablePatch();
     ensurePineMarkerPatch();
-    const klines = toKlines(bars, market.timeframe, market.symbolInfo);
+    const klines = toKlines(bars, market.timeframe, market.symbolInfo, marketSession(market));
     // The virtual provider: serve the chart's own series in-memory (the bars Vela
     // owns), but route any OTHER (symbol, timeframe) — i.e. request.security HTF/LTF/
     // cross-symbol — back to Vela's cache-backed gateway. PineTS reuses this same
@@ -371,7 +371,7 @@ function tfMinutesFor(tf: string | undefined): number | null {
  * open→close span keep the offset of the open (off by the jump on those bars, twice a
  * year).
  */
-function sessionCloser(bars: OHLCV[], tf: string | undefined, syminfo: unknown): ((openMs: number) => number | null) | null {
+function sessionCloser(bars: OHLCV[], tf: string | undefined, syminfo: unknown, session?: unknown): ((openMs: number) => number | null) | null {
     // `unknown` on purpose: callers hand over whatever symbol-info shape their feed
     // declares (the port type varies across host versions) — one narrowing here keeps
     // every call site assertion-free under either set of typings.
@@ -382,7 +382,13 @@ function sessionCloser(bars: OHLCV[], tf: string | undefined, syminfo: unknown):
     if (tfMin == null || regular == null || tz == null || bars.length === 0) return null;
     const extended = sessionSpan(si?.session_extended);
     let active = regular;
-    if (extended) {
+    if (session === 'regular') {
+        // The request names the session: regular is authoritative, no bar sniffing.
+    } else if (session === 'extended') {
+        // The request names the session: extended is authoritative (when declared).
+        if (extended) active = extended;
+    } else if (extended) {
+        // No (or unrecognised) request session: infer from the bars themselves.
         for (const b of bars) {
             const m = wallMinuteOfDay(b.time, tz);
             if (m != null && !inSpan(m, regular) && inSpan(m, extended)) {
@@ -399,11 +405,19 @@ function sessionCloser(bars: OHLCV[], tf: string | undefined, syminfo: unknown):
     };
 }
 
+/** The trading session the request names (`market.session`: 'regular' | 'extended');
+ *  undefined when absent (older hosts, sessionless charts) — callers then fall back
+ *  to the syminfo/bars inference. */
+function marketSession(market: ExecutionMarket): 'regular' | 'extended' | undefined {
+    const s = (market as { session?: unknown }).session;
+    return s === 'regular' || s === 'extended' ? s : undefined;
+}
+
 /** OHLCV → PineTS kline shape (openTime-keyed). With a chart timeframe and a
  *  session-market syminfo, each kline carries its session {@link sessionCloser | closeTime}
  *  — continuous markets (and W/M) emit none and the engine's `open + tf` net applies. */
-export function toKlines(bars: OHLCV[], tf?: string, syminfo?: unknown): Array<Record<string, number>> {
-    const closer = sessionCloser(bars, tf, syminfo);
+export function toKlines(bars: OHLCV[], tf?: string, syminfo?: unknown, session?: unknown): Array<Record<string, number>> {
+    const closer = sessionCloser(bars, tf, syminfo, session);
     return bars.map((b) => {
         const k: Record<string, number> = { openTime: b.time, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume ?? 0 };
         const ct = closer?.(b.time);
@@ -441,10 +455,11 @@ export async function secondaryKlines(
     sDate?: number,
     eDate?: number,
     syminfo?: Record<string, unknown>,
+    session?: unknown,
 ): Promise<Array<Record<string, number>>> {
     if (!fetchSeries || !sym || !tf) return [];
     const bars = await fetchSeries(sym, tf, { from: sDate, to: eDate, limit });
-    return toKlines(bars, tf, syminfo);
+    return toKlines(bars, tf, syminfo, session);
 }
 
 /** The streaming provider a live PineTS session polls (see {@link makeLiveProvider}). */
@@ -478,9 +493,9 @@ export function makeLiveProvider(getBars: () => OHLCV[], getMarket: () => Execut
             // Secondary series (request.security HTF/LTF/cross-symbol) → cache-backed gateway.
             const market = getMarket();
             if (!isChartSeries(ticker, tf, market)) {
-                return secondaryKlines(fetchSeries, ticker, tf, limit, sDate, eDate, syminfoForSymbol(market, ticker));
+                return secondaryKlines(fetchSeries, ticker, tf, limit, sDate, eDate, syminfoForSymbol(market, ticker), marketSession(market));
             }
-            const klines = toKlines(getBars(), market.timeframe, market.symbolInfo);
+            const klines = toKlines(getBars(), market.timeframe, market.symbolInfo, marketSession(market));
             // Initial load (no sDate): full history.
             if (sDate == null) return klines;
             // Streaming update: only the forming candle + any newer bars.
