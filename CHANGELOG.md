@@ -2,6 +2,47 @@
 
 All notable changes to Vela-pinets, newest first.
 
+## [v0.3.3]
+
+### Changed
+
+- **Works with Vela 0.10.** The peer range now includes `@luxalgo/vela` 0.10, whose UI kit
+  ships as its own package, `@luxalgo/vela-ui`. The engines use none of the kit, so nothing
+  changes for them; the package now builds and is tested against Vela 0.10.0.
+
+## [v0.3.2]
+
+### Added
+
+- **A strategy reports its growth, risk ratios and buy-and-hold benchmark.** The figures
+  PineTS computes over the whole run now reach the host with the strategy's state: CAGR,
+  the Sharpe and Sortino ratios, and the buy-and-hold P&L, gain and the strategy's
+  outperformance over it. A figure PineTS cannot compute (no trade to anchor buy and hold
+  on, an account wiped out) is left out. Vela 0.9.3 types these fields on
+  `StrategyState`; the package now builds against it.
+
+### Fixed
+
+- **A script's short title labels it on the chart.** A script that declares one
+  (`indicator("Moving Average Ribbon", shorttitle = "MAR")`) now shows it on its legend row
+  and in its settings-dialog header; the full title stays everywhere else.
+- **A script with an empty title is named "Study".** `indicator("")` and `strategy("")`
+  used to be added with a blank legend row, which left nothing to hover, so their
+  settings and remove controls could not be reached.
+
+## [v0.3.1]
+
+### Changed
+
+- **The worker bundle carries PineTS 0.13.1.** Scripts in the worker-backed engine pick up
+  its fixes: a function returning a field chain, a history series in an `else if`
+  condition, daily, weekly and monthly periods on markets whose trading day opens the
+  evening before, the close time of the forming bar on live ticks, and the v5 `when`
+  argument of the strategy order commands. Large scripts also prepare faster. The `pinets`
+  peer range stays `>=0.13.0`, so the in-process engine runs whichever PineTS the host
+  installs; upgrade it to 0.13.1 for the same fixes there. Built against `@luxalgo/vela`
+  0.9.1.
+
 ## [v0.3.0]
 
 ### Added
