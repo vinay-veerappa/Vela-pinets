@@ -265,6 +265,11 @@ export async function runPineStatic(opts: {
         ...footprintSurface(footprints, () => market.symbol, () => market.timeframe),
     };
     const pine = new PineTS(source as never, chartTickerOf(market), market.timeframe, klines.length);
+    // The host's own indicator library contains scripts whose loops need more than
+    // pinets' 500k-iteration default (CurrentDayMedian). Keep a bound, sized for this app;
+    // guarded so the engine still runs on a release without the knob.
+    pine.setMaxLoops?.(5_000_000);
+    pine.setMaxFunctionCalls?.(5_000_000);
     const libraries = (prepared.token as PineToken).libraries;
     if (libraries) pine.setImportResolver(linkerFor(libraries));
     await pine.ready();
@@ -556,6 +561,8 @@ export function openLiveStream(opts: {
     const initialLen = Math.max(1, bars.length);
     const provider = makeLiveProvider(opts.bars, opts.market, opts.fetchSeries, opts.footprints);
     const pine = new PineTS(provider as never, chartTickerOf(opts.market()), opts.market().timeframe, initialLen);
+    pine.setMaxLoops?.(5_000_000); // see runPineStatic: sized for this host's own scripts
+    pine.setMaxFunctionCalls?.(5_000_000);
     if (opts.token.libraries) pine.setImportResolver(linkerFor(opts.token.libraries));
     if (opts.visibleRange) pine.setVisibleRange(opts.visibleRange.left, opts.visibleRange.right);
     const evt = pine.stream(ind, { live: true, interval: 1000, pageSize: initialLen }) as {
